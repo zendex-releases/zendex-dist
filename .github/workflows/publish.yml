@@ -1,0 +1,47 @@
+name: publish
+
+# Re-publishes a release under the github-actions bot identity so the release
+# page does not credit the account that triggered it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version without the v prefix, e.g. 6.10.1"
+        required: true
+      setup_url:
+        description: "Direct URL of the installer to fetch"
+        required: true
+      portable_url:
+        description: "Direct URL of the portable zip (optional)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch assets
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          curl -L --fail --retry 3 -o "out/Zendex-${{ inputs.version }}-Setup.exe" "${{ inputs.setup_url }}"
+          if [ -n "${{ inputs.portable_url }}" ]; then
+            curl -L --fail --retry 3 -o "out/Zendex_Client_Hardened.zip" "${{ inputs.portable_url }}"
+          fi
+          cd out && sha256sum ./* | sed 's|\./||' > SHA256SUMS.txt
+          ls -lh
+
+      - name: Replace release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ inputs.version }}"
+          gh release delete "$TAG" --cleanup-tag -y || true
+          gh release create "$TAG" out/* \
+            --title "Zendex ${{ inputs.version }}" \
+            --notes "Windows x64. Verify with SHA256SUMS.txt."
