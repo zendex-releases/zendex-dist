@@ -1,0 +1,6 @@
+*
+!.gitignore
+!README.md
+!LICENSE
+!publish.ps1
+!worker.js
