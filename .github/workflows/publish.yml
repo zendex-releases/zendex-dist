@@ -1,4 +1,4 @@
-name: publish
+﻿name: publish
 
 # Re-publishes a release under the github-actions bot identity so the release
 # page does not credit the account that triggered it.
@@ -24,6 +24,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Fetch assets
         run: |
           set -euo pipefail
@@ -41,7 +43,8 @@ jobs:
         run: |
           set -euo pipefail
           TAG="v${{ inputs.version }}"
-          gh release delete "$TAG" --cleanup-tag -y || true
-          gh release create "$TAG" out/* \
+          REPO="${{ github.repository }}"
+          gh release delete "$TAG" --cleanup-tag -y --repo "$REPO" || true
+          gh release create "$TAG" out/* --repo "$REPO" \
             --title "Zendex ${{ inputs.version }}" \
             --notes "Windows x64. Verify with SHA256SUMS.txt."
