@@ -2,18 +2,33 @@
 
 # Re-publishes a release under the github-actions bot identity so the release
 # page does not credit the account that triggered it.
+#
+# Assets can come from either:
+#   * public URLs (setup_url / portable_url), or
+#   * draft-release asset IDs (setup_asset_id / portable_asset_id), fetched
+#     with the repo token. Drafts are invisible to the public, so staging the
+#     release as a draft keeps the trigger account out of it entirely.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version without the v prefix, e.g. 6.10.1"
+        description: "Version without the v prefix, e.g. 6.10.2"
         required: true
       setup_url:
-        description: "Direct URL of the installer to fetch"
-        required: true
+        description: "Direct URL of the installer (or use setup_asset_id)"
+        required: false
+        default: ""
       portable_url:
         description: "Direct URL of the portable zip (optional)"
+        required: false
+        default: ""
+      setup_asset_id:
+        description: "Asset ID on a draft release of this repo (optional)"
+        required: false
+        default: ""
+      portable_asset_id:
+        description: "Asset ID on a draft release of this repo (optional)"
         required: false
         default: ""
 
@@ -27,11 +42,24 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           mkdir -p out
-          curl -L --fail --retry 3 -o "out/Zendex-${{ inputs.version }}-Setup.exe" "${{ inputs.setup_url }}"
-          if [ -n "${{ inputs.portable_url }}" ]; then
+          REPO="${{ github.repository }}"
+          if [ -n "${{ inputs.setup_asset_id }}" ]; then
+            gh api "repos/${REPO}/releases/assets/${{ inputs.setup_asset_id }}" \
+              -H "Accept: application/octet-stream" \
+              > "out/Zendex-${{ inputs.version }}-Setup.exe"
+          else
+            curl -L --fail --retry 3 -o "out/Zendex-${{ inputs.version }}-Setup.exe" "${{ inputs.setup_url }}"
+          fi
+          if [ -n "${{ inputs.portable_asset_id }}" ]; then
+            gh api "repos/${REPO}/releases/assets/${{ inputs.portable_asset_id }}" \
+              -H "Accept: application/octet-stream" \
+              > "out/Zendex_Client_Hardened.zip"
+          elif [ -n "${{ inputs.portable_url }}" ]; then
             curl -L --fail --retry 3 -o "out/Zendex_Client_Hardened.zip" "${{ inputs.portable_url }}"
           fi
           cd out && sha256sum ./* | sed 's|\./||' > SHA256SUMS.txt
